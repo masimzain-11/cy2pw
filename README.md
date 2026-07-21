@@ -1,4 +1,5 @@
 # cy2pw — Cypress → Playwright migration engine
+![coverage](https://github.com/masimzain-11/cy2pw/actions/workflows/coverage.yml/badge.svg)
 
 A three-layer tool that migrates Cypress test suites to Playwright. It converts
 what can be converted mechanically, uses an LLM only for what genuinely needs
