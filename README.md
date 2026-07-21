@@ -12,20 +12,35 @@ suite can actually be automated away, and what's the irreducible human part?*
 
 ## Coverage on real suites
 
-Measured on three production specs from
+Coverage is measured against **unmodified third-party production specs**, not
+hand-picked examples: three specs from
 [`cypress-realworld-app`](https://github.com/cypress-io/cypress-realworld-app)
-(Cypress's own reference application — code I did not write):
+(Cypress's own reference application), plus one controlled `login` spec that is
+also verified end-to-end through the repair loop.
 
-| Layer                              | Statements | Share |
-| ---------------------------------- | ---------- | ----- |
-| Auto-converted (deterministic)     | 136        | ~56%  |
-| LLM-convertible                    | 56         | ~23%  |
-| Manual rewrite (app infrastructure)| 52         | ~21%  |
-| Crashed                            | 0          | 0%    |
+```
+────────────────────────────────────────────────────────────────
+SPEC                          auto     LLM    manl    fail
+────────────────────────────────────────────────────────────────
+login                        12    0    0    0
+rwa-auth                     51   17   23    0
+rwa-new-transaction          49   35   24    0
+rwa-user-settings            36    4    5    0
+────────────────────────────────────────────────────────────────
+TOTAL (4 specs)             148   56   52    0
+────────────────────────────────────────────────────────────────
+```
 
-**244 real Cypress statements, zero crashes.** The number that matters isn't the
-56% — it's that the tool *classifies* the remaining 44% correctly instead of
-pretending it converted them.
+| Layer                               | Statements | Share |
+| ----------------------------------- | ---------- | ----- |
+| Auto-converted (deterministic)      | 148        | ~58%  |
+| LLM-convertible                     | 56         | ~22%  |
+| Manual rewrite (app infrastructure) | 52         | ~20%  |
+| Crashed                             | 0          | 0%    |
+
+**256 Cypress statements, zero crashes.** The number that matters isn't the 58% —
+it's that the tool *classifies* the remaining 42% correctly instead of pretending
+it converted them. Reproduce it yourself with `npx tsx src/cy2pw.ts samples`.
 
 ---
 
@@ -48,12 +63,14 @@ for conversion (`cy.intercept` → `page.route`, `cy.wait('@alias')` →
 `page.waitForResponse`). Cheap because the deterministic layer already did the
 bulk. A free `CY2PW_DRY_RUN` mode tests the plumbing with no API cost.
 
-**3. Run-verify-repair loop (`verify.ts`)** — the point of the whole thing. Runs
-the migrated spec against the live app; on failure it feeds the spec + the runner
-output back to Claude for a fix, then re-runs, up to a bounded number of attempts.
-Static conversion produces code that *looks* right; only running it proves it.
+**3. Run-verify-repair loop (`verify.ts`)** — runs the migrated spec against the
+live app; on failure it feeds the spec + the runner output back to Claude for a
+fix, then re-runs, up to a bounded number of attempts. Static conversion produces
+code that *looks* right; only running it proves it. Currently verified end-to-end
+on the `login` spec; running it against the RWA specs first requires resolving
+their manual-rewrite items (see roadmap).
 
-`cy2pw.ts` orchestrates layer 1 across a suite and prints the coverage table.
+`cy2pw.ts` orchestrates layer 1 across a suite and prints the coverage table above.
 
 ---
 
@@ -68,7 +85,7 @@ npx tsx src/cy2pw.ts samples
 
 # single file, each layer explicitly
 npx tsx src/migrate.ts samples/login.cy.ts        # layer 1 -> out/login.spec.ts
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY=your-key-here
 npx tsx src/ai-fill.ts out/login.spec.ts          # layer 2 (fills unknowns)
 npx tsx src/verify.ts out/login.spec.ts           # layer 3 (runs + self-repairs)
 ```
